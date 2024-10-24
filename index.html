@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Race Bar Chart com D3.js</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 20px;
+        }
+        .chart {
+            margin: 20px auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px auto;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        input {
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .btn {
+            margin: 5px;
+            padding: 10px 15px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Race Bar Chart com Tabela Interativa</h1>
+    
+    <table id="dataTable">
+        <thead>
+            <tr>
+                <th>Produto</th>
+                <th><input type="text" value="Período 1" class="period-input"></th>
+                <th><input type="text" value="Período 2" class="period-input"></th>
+                <th><input type="text" value="Período 3" class="period-input"></th>
+                <th><button id="addColumnButton">Adicionar Coluna</button></th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><input type="text" value="Produto A"></td>
+                <td><input type="number" value="10"></td>
+                <td><input type="number" value="15"></td>
+                <td><input type="number" value="20"></td>
+                <td><button class="btn removeRowButton">Remover</button></td>
+            </tr>
+            <tr>
+                <td><input type="text" value="Produto B"></td>
+                <td><input type="number" value="20"></td>
+                <td><input type="number" value="10"></td>
+                <td><input type="number" value="5"></td>
+                <td><button class="btn removeRowButton">Remover</button></td>
+            </tr>
+            <tr>
+                <td><input type="text" value="Produto C"></td>
+                <td><input type="number" value="30"></td>
+                <td><input type="number" value="25"></td>
+                <td><input type="number" value="10"></td>
+                <td><button class="btn removeRowButton">Remover</button></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <button class="btn" id="addRowButton">Adicionar Linha</button>
+    <button class="btn" id="generateChartButton">Gerar Gráfico</button>
+    <button class="btn" id="exportGIFButton">Exportar como GIF</button>
+    <div class="chart">
+        <svg id="raceBarChart" width="800" height="400"></svg>
+    </div>
+
+    <!-- D3.js e html2canvas e gif.js -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/0.4.1/html2canvas.min.js"></script>
+    <script src="https://cdn.rawgit.com/jnordberg/gif.js/master/dist/gif.js"></script>
+
+    <script>
+        const svg = d3.select("#raceBarChart");
+        let data = [];
+        let periods = [];
+
+        // Função para gerar o gráfico a partir da tabela
+        function generateChartFromTable() {
+            data = [];
+            periods = [];
+
+            const rows = document.querySelectorAll('#dataTable tbody tr');
+            rows.forEach(row => {
+                const product = row.cells[0].querySelector('input').value;
+                const values = [];
+                for (let i = 1; i < row.cells.length - 1; i++) { // Ignorar coluna de remover
+                    values.push(Number(row.cells[i].querySelector('input').value));
+                }
+                data.push({ product, values });
+            });
+
+            // Obter os nomes dos períodos
+            const periodInputs = document.querySelectorAll('.period-input');
+            periodInputs.forEach(input => {
+                periods.push(input.value);
+            });
+
+            // Criar gráfico
+            drawRaceBarChart(data, periods);
+        }
+
+        // Função para desenhar o gráfico
+        function drawRaceBarChart(data, periods) {
+            svg.selectAll("*").remove(); // Limpar SVG antes de desenhar
+
+            const width = +svg.attr("width");
+            const height = +svg.attr("height");
+
+            const maxValue = d3.max(data, d => d3.max(d.values));
+            const x = d3.scaleLinear()
+                .domain([0, maxValue])
+                .range([0, width - 100]);
+
+            const y = d3.scaleBand()
+                .domain(data.map(d => d.product))
+                .range([0, height])
+                .padding(0.1);
+
+            const g = svg.append("g").attr("transform", "translate(50,0)");
+
+            // Adicionar os eixos
+            g.append("g")
+                .attr("class", "x-axis")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(x).tickFormat(d => `${d}`));
+
+            g.append("g")
+                .attr("class", "y-axis")
+                .call(d3.axisLeft(y));
+
+            // Adicionar as barras animadas
+            let currentIndex = 0;
+
+            function updateChart() {
+                if (currentIndex < data[0].values.length) {
+                    const currentData = data.map((d, index) => ({
+                        product: d.product,
+                        value: d.values[currentIndex],
+                        period: periods[currentIndex]
+                    }));
+                    
+                    const bars = g.selectAll(".bar")
+                        .data(currentData, d => d.product);
+                    
+                    bars.exit().remove(); // Remove barras que não estão mais em uso
+
+                    const newBars = bars.enter().append("rect")
+                        .attr("class", "bar")
+                        .attr("x", 0)
+                        .attr("y", d => y(d.product))
+                        .attr("height", y.bandwidth())
+                        .attr("fill", (d, i) => d3.schemeCategory10[i % 10]);
+
+                    // Animação das barras
+                    newBars.merge(bars)
+                        .transition()
+                        .duration(1000)
+                        .attr("width", d => x(d.value));
+
+                    // Adicionar rótulos de dados
+                    const labels = g.selectAll(".label")
+                        .data(currentData, d => d.product);
+
+                    labels.exit().remove(); // Remove rótulos que não estão mais em uso
+
+                    labels.enter().append("text")
+                        .attr("class", "label")
+                        .attr("x", d => x(d.value) + 5) // Posiciona um pouco à direita da barra
+                        .attr("y", d => y(d.product) + y.bandwidth() / 2) // Centraliza verticalmente
+                        .attr("dy", ".35em") // Ajusta para o meio
+                        .text(d => d.value)
+                        .merge(labels) // Atualiza rótulos existentes
+                        .transition()
+                        .duration(1000)
+                        .attr("x", d => x(d.value) + 5)
+                        .text(d => d.value); // Atualiza o texto
+
+                    // Atualiza os rótulos dos períodos
+                    g.selectAll(".period-label").remove(); // Limpar rótulos anteriores
+                    g.append("text")
+                        .attr("class", "period-label")
+                        .attr("x", width / 2)
+                        .attr("y", height - 20)
+                        .attr("text-anchor", "middle")
+                        .style("font-size", "20px")
+                        .text(`Período: ${currentData[0].period}`);
+
+                    currentIndex++;
+                    setTimeout(updateChart, 1000); // Atualiza a cada segundo
+                }
+            }
+            updateChart(); // Inicia a animação
+        }
+
+        // Função para exportar o gráfico como GIF
+        function exportChartAsGIF() {
+            const totalFrames = data[0].values.length;
+            let capturedFrames = 0;
+
+            const gif = new GIF({
+                workers: 2,
+                quality: 10,
+                width: 800,
+                height: 400,
+            });
+
+            function captureFrame() {
+                // Captura do SVG
+                html2canvas(svg.node()).then(canvas => {
+                    gif.addFrame(canvas, { delay: 100, copy: true });
+                    capturedFrames++;
+
+                    if (capturedFrames < totalFrames) {
+                        drawRaceBarChart(data, periods);
+                        setTimeout(captureFrame, 1000); // Espera um segundo antes de capturar o próximo
+                    } else {
+                        gif.render(); // Renderiza o GIF
+                        gif.on('finished', function(blob) {
+                            const link = document.createElement('a');
+                            link.href = URL.createObjectURL(blob);
+                            link.download = 'race_bar_chart.gif';
+                            link.click();
+                        });
+                    }
+                });
+            }
+
+            captureFrame(); // Inicia a captura de frames
+        }
+
+        // Adicionar evento para o botão de gerar gráfico
+        document.getElementById("generateChartButton").addEventListener("click", generateChartFromTable);
+
+        // Adicionar evento para o botão de exportar GIF
+        document.getElementById("exportGIFButton").addEventListener("click", exportChartAsGIF);
+
+        // Adicionar evento para o botão de adicionar linha
+        document.getElementById("addRowButton").addEventListener("click", () => {
+            const newRow = document.createElement('tr');
+            newRow.innerHTML = `
+                <td><input type="text" value="Novo Produto"></td>
+                <td><input type="number" value="0"></td>
+                <td><input type="number" value="0"></td>
+                <td><input type="number" value="0"></td>
+                <td><button class="btn removeRowButton">Remover</button></td>
+            `;
+            document.querySelector('#dataTable tbody').appendChild(newRow);
+        });
+
+        // Adicionar evento para remover linhas
+        document.addEventListener("click", function(event) {
+            if (event.target.classList.contains("removeRowButton")) {
+                const row = event.target.closest('tr');
+                row.remove();
+            }
+        });
+    </script>
+</body>
+</html>
