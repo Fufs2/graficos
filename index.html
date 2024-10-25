@@ -83,9 +83,9 @@
         <svg id="raceBarChart" width="800" height="400"></svg>
     </div>
 
-    <!-- D3.js e html2canvas e gif.js -->
+    <!-- D3.js, canvg e gif.js -->
     <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/0.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/canvg/3.0.8/canvg.min.js"></script>
     <script src="https://cdn.rawgit.com/jnordberg/gif.js/master/dist/gif.js"></script>
 
     <script>
@@ -220,41 +220,44 @@
                 workers: 2,
                 quality: 10,
                 width: 800,
-                height: 400,
+                height: 400
             });
 
             function captureFrame() {
-                // Captura do SVG
-                html2canvas(svg.node()).then(canvas => {
-                    gif.addFrame(canvas, { delay: 100, copy: true });
-                    capturedFrames++;
+                const svgString = new XMLSerializer().serializeToString(svg.node());
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
 
-                    if (capturedFrames < totalFrames) {
-                        drawRaceBarChart(data, periods);
-                        setTimeout(captureFrame, 1000); // Espera um segundo antes de capturar o próximo
-                    } else {
-                        gif.render(); // Renderiza o GIF
-                        gif.on('finished', function(blob) {
-                            const link = document.createElement('a');
-                            link.href = URL.createObjectURL(blob);
-                            link.download = 'race_bar_chart.gif';
-                            link.click();
+                canvg(canvas, svgString, {
+                    renderCallback: function () {
+                        gif.addFrame(context, {
+                            delay: 200,
+                            copy: true
                         });
+
+                        capturedFrames++;
+                        if (capturedFrames < totalFrames) {
+                            setTimeout(captureFrame, 1000); // Aguardar 1 segundo antes de capturar o próximo frame
+                        } else {
+                            gif.on('finished', function(blob) {
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = 'race_chart.gif';
+                                a.click();
+                            });
+                            gif.render();
+                        }
                     }
                 });
             }
 
-            captureFrame(); // Inicia a captura de frames
+            captureFrame(); // Iniciar a captura de frames
         }
 
-        // Adicionar evento para o botão de gerar gráfico
-        document.getElementById("generateChartButton").addEventListener("click", generateChartFromTable);
-
-        // Adicionar evento para o botão de exportar GIF
-        document.getElementById("exportGIFButton").addEventListener("click", exportChartAsGIF);
-
-        // Adicionar evento para o botão de adicionar linha
-        document.getElementById("addRowButton").addEventListener("click", () => {
+        // Eventos dos botões
+        document.getElementById('generateChartButton').addEventListener('click', generateChartFromTable);
+        document.getElementById('addRowButton').addEventListener('click', () => {
             const newRow = document.createElement('tr');
             newRow.innerHTML = `
                 <td><input type="text" value="Novo Produto"></td>
@@ -266,11 +269,31 @@
             document.querySelector('#dataTable tbody').appendChild(newRow);
         });
 
-        // Adicionar evento para remover linhas
-        document.addEventListener("click", function(event) {
-            if (event.target.classList.contains("removeRowButton")) {
-                const row = event.target.closest('tr');
-                row.remove();
+        document.getElementById('addColumnButton').addEventListener('click', () => {
+            const newHeader = document.createElement('th');
+            const newPeriodInput = document.createElement('input');
+            newPeriodInput.type = 'text';
+            newPeriodInput.value = `Período ${document.querySelectorAll('.period-input').length + 1}`;
+            newHeader.appendChild(newPeriodInput);
+            document.querySelector('#dataTable thead tr').insertBefore(newHeader, document.querySelector('#dataTable thead tr').lastChild);
+            
+            const rows = document.querySelectorAll('#dataTable tbody tr');
+            rows.forEach(row => {
+                const newCell = document.createElement('td');
+                const newInput = document.createElement('input');
+                newInput.type = 'number';
+                newInput.value = '0';
+                newCell.appendChild(newInput);
+                row.appendChild(newCell);
+            });
+        });
+
+        document.getElementById('exportGIFButton').addEventListener('click', exportChartAsGIF);
+
+        // Remover linhas
+        document.addEventListener('click', function(event) {
+            if (event.target.classList.contains('removeRowButton')) {
+                event.target.closest('tr').remove();
             }
         });
     </script>
