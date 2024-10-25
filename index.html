@@ -85,7 +85,7 @@
 
     <!-- D3.js, canvg e gif.js -->
     <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/canvg/3.0.8/canvg.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvg@3.0.8/dist/canvg.min.js"></script>
     <script src="https://cdn.rawgit.com/jnordberg/gif.js/master/dist/gif.js"></script>
 
     <script>
@@ -226,11 +226,12 @@
             function captureFrame() {
                 const svgString = new XMLSerializer().serializeToString(svg.node());
                 const canvas = document.createElement('canvas');
-                const context = canvas.getContext('2d');
+                canvas.width = 800;
+                canvas.height = 400;
 
                 canvg(canvas, svgString, {
                     renderCallback: function () {
-                        gif.addFrame(context, {
+                        gif.addFrame(canvas.getContext('2d'), {
                             delay: 200,
                             copy: true
                         });
